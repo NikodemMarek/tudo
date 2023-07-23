@@ -1,7 +1,8 @@
+use chrono::NaiveDateTime;
 use hyper::client::HttpConnector;
 use hyper_rustls::HttpsConnector;
 use tasks1::TasksHub;
-use tui::widgets::ListState;
+use tui::widgets::{ListState, TableState};
 
 pub struct App {
     hub: TasksHub<HttpsConnector<HttpConnector>>,
@@ -10,7 +11,7 @@ pub struct App {
 
     pub tasklists: Vec<Tasklist>,
     pub active_tasklist: usize,
-    pub tasks_state: ListState,
+    pub tasks_state: TableState,
 }
 impl App {
     pub fn new(hub: TasksHub<HttpsConnector<HttpConnector>>) -> Self {
@@ -19,7 +20,7 @@ impl App {
             should_quit: false,
             tasklists: Vec::new(),
             active_tasklist: 0,
-            tasks_state: ListState::default(),
+            tasks_state: TableState::default(),
         }
     }
 
@@ -38,12 +39,12 @@ impl App {
     }
 
     pub fn tasklists_next(&mut self) {
-        self.tasks_state = ListState::default();
+        self.tasks_state = TableState::default();
 
         self.active_tasklist = (self.active_tasklist + 1) % self.tasklists.len();
     }
     pub fn tasklists_previous(&mut self) {
-        self.tasks_state = ListState::default();
+        self.tasks_state = TableState::default();
 
         if self.active_tasklist > 0 {
             self.active_tasklist -= 1;
@@ -146,12 +147,14 @@ impl Tasklist {
 pub struct Task {
     pub id: String,
     pub title: String,
+    pub due: Option<NaiveDateTime>,
 }
 impl Task {
-    pub fn new(id: &str, title: &str) -> Self {
+    pub fn new(id: &str, title: &str, due: Option<NaiveDateTime>) -> Self {
         Self {
             id: id.to_string(),
             title: title.to_string(),
+            due,
         }
     }
 }

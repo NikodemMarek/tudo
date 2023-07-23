@@ -54,8 +54,19 @@ pub mod tasks {
                 tasks1::api::Task {
                     id: Some(id),
                     title: Some(title),
+                    due,
                     ..
-                } => Some(Task::new(&id.clone(), &title.clone())),
+                } => Some(Task::new(
+                    &id.clone(),
+                    &title.clone(),
+                    due.clone()
+                        .map(|x| {
+                            chrono::DateTime::parse_from_rfc3339(&x)
+                                .ok()
+                                .map(|x| x.naive_local())
+                        })
+                        .flatten(),
+                )),
                 _ => None,
             })
             .flatten()

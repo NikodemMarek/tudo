@@ -4,7 +4,7 @@ use tui::{
     style::{Color, Modifier, Style},
     symbols::line,
     text::{Spans, Text},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Tabs},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table, Tabs},
     Frame,
 };
 
@@ -13,7 +13,7 @@ use crate::{
     App,
 };
 
-fn lists<'a, B: Backend>(list_names: &[Tasklist]) -> Tabs<'a> {
+fn tasklists<'a, B: Backend>(list_names: &[Tasklist]) -> Tabs<'a> {
     let tabs = list_names
         .iter()
         .map(|x| Spans::from(x.title.clone()))
@@ -22,20 +22,36 @@ fn lists<'a, B: Backend>(list_names: &[Tasklist]) -> Tabs<'a> {
     Tabs::new(tabs)
         .block(Block::default().borders(Borders::BOTTOM))
         .style(Style::default().fg(Color::White))
-        .highlight_style(Style::default().fg(Color::Yellow))
+        .highlight_style(Style::default().fg(Color::Blue))
         .divider(line::VERTICAL)
 }
 
-fn todos_component<'a, B: Backend>(todos: &[Task]) -> List<'a> {
+fn todos_component<'a, B: Backend>(todos: &[Task]) -> Table<'a> {
     let todos = todos
         .iter()
-        .map(|x| ListItem::new(x.title.clone()))
-        .collect::<Vec<ListItem>>();
+        .map(|x| {
+            Row::new(vec![
+                // TODO: Format date like in the original
+                Cell::from(
+                    x.due
+                        .map(|x| x.format("%Y-%m-%d %H:%M:%S").to_string())
+                        .unwrap_or("".to_string()),
+                )
+                .style(Style::default().fg(Color::Red)),
+                Cell::from(x.title.clone()),
+            ])
+        })
+        .collect::<Vec<Row>>();
 
-    List::new(todos)
+    Table::new(todos)
+        .header(Row::new(vec!["Due", "Title"]))
+        .widths(&[Constraint::Length(20), Constraint::Length(20)])
         .style(Style::default().fg(Color::White))
-        .highlight_style(Style::default().add_modifier(Modifier::ITALIC))
-        .highlight_symbol(">>")
+        .highlight_style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .bg(Color::Black),
+        )
 }
 
 pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
@@ -46,7 +62,7 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .split(f.size());
 
     if let Some(tasklist) = app.active_tasklist() {
-        let tabs = lists::<B>(&app.tasklists).select(app.active_tasklist);
+        let tabs = tasklists::<B>(&app.tasklists).select(app.active_tasklist);
         f.render_widget(tabs, chunks[0]);
 
         match tasklist.is_empty() {
