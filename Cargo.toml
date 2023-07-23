@@ -2,9 +2,15 @@
 name = "tudo"
 version = "0.1.0"
 edition = "2021"
-description = "Todo tui app written in Rust"
+description = "Simple tui wrapper for google-tasks1"
 authors = ["Nikodem Marek <nikodemmarek11@gmail.com>"]
 
 [dependencies]
-tui = "0.19.0"
+tokio = { version = "1.29.1", features = ["rt-multi-thread"] }
+yup-oauth2 = "8.3.0"
+hyper = "0.14.27"
+hyper-rustls = "0.24.1"
+google-tasks1 = "*"
+anyhow = "1.0"
+tui = "0.19"
 crossterm = "0.25"
