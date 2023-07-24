@@ -10,6 +10,7 @@ use tui::{
 
 use crate::{
     app::{Task, Tasklist},
+    timestamps::formatter,
     App,
 };
 
@@ -31,13 +32,15 @@ fn todos_component<'a, B: Backend>(todos: &[Task]) -> Table<'a> {
         .iter()
         .map(|x| {
             Row::new(vec![
-                // TODO: Format date like in the original
-                Cell::from(
-                    x.due
-                        .map(|x| x.format("%Y-%m-%d %H:%M:%S").to_string())
-                        .unwrap_or("".to_string()),
-                )
-                .style(Style::default().fg(Color::Red)),
+                {
+                    let (str, color) = x
+                        .due
+                        .as_ref()
+                        .map(formatter::relative)
+                        .unwrap_or(("".to_string(), Color::Reset));
+
+                    Cell::from(str).style(Style::default().fg(color))
+                },
                 Cell::from(x.title.clone()),
             ])
         })

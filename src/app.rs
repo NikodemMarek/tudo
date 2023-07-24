@@ -1,8 +1,9 @@
-use chrono::NaiveDateTime;
 use hyper::client::HttpConnector;
 use hyper_rustls::HttpsConnector;
 use tasks1::TasksHub;
-use tui::widgets::{ListState, TableState};
+use tui::widgets::TableState;
+
+use crate::timestamps::TimestampType;
 
 pub struct App {
     hub: TasksHub<HttpsConnector<HttpConnector>>,
@@ -147,10 +148,10 @@ impl Tasklist {
 pub struct Task {
     pub id: String,
     pub title: String,
-    pub due: Option<NaiveDateTime>,
+    pub due: Option<TimestampType>,
 }
 impl Task {
-    pub fn new(id: &str, title: &str, due: Option<NaiveDateTime>) -> Self {
+    pub fn new(id: &str, title: &str, due: Option<TimestampType>) -> Self {
         Self {
             id: id.to_string(),
             title: title.to_string(),

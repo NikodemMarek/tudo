@@ -37,6 +37,7 @@ pub mod tasks {
     use tasks1::TasksHub;
 
     use crate::app::Task;
+    use crate::timestamps::TimestampType;
 
     pub async fn load(
         hub: &TasksHub<HttpsConnector<HttpConnector>>,
@@ -63,7 +64,12 @@ pub mod tasks {
                         .map(|x| {
                             chrono::DateTime::parse_from_rfc3339(&x)
                                 .ok()
-                                .map(|x| x.naive_local())
+                                .map(|y| match x {
+                                    i if i.ends_with("T00:00:00.000Z") => {
+                                        TimestampType::Date(y.naive_local().date())
+                                    }
+                                    _ => TimestampType::DateTime(y.naive_local()),
+                                })
                         })
                         .flatten(),
                 )),
