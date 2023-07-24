@@ -1,13 +1,8 @@
-use hyper::client::HttpConnector;
-use hyper_rustls::HttpsConnector;
-use tasks1::TasksHub;
 use tui::widgets::TableState;
 
 use crate::timestamps::TimestampType;
 
 pub struct App {
-    hub: TasksHub<HttpsConnector<HttpConnector>>,
-
     pub should_quit: bool,
 
     pub tasklists: Vec<Tasklist>,
@@ -15,23 +10,13 @@ pub struct App {
     pub tasks_state: TableState,
 }
 impl App {
-    pub fn new(hub: TasksHub<HttpsConnector<HttpConnector>>) -> Self {
+    pub fn new(tasklist: &[Tasklist]) -> Self {
         Self {
-            hub,
             should_quit: false,
-            tasklists: Vec::new(),
+            tasklists: tasklist.to_vec(),
             active_tasklist: 0,
             tasks_state: TableState::default(),
         }
-    }
-
-    pub async fn load(&mut self) -> anyhow::Result<()> {
-        self.tasklists = api::tasklists::load(&self.hub).await?;
-        for tasklist in self.tasklists.iter_mut() {
-            tasklist.load(&self.hub).await?;
-        }
-
-        Ok(())
     }
 
     pub fn on_tick(&mut self) {}
@@ -95,9 +80,8 @@ impl App {
         }
     }
 }
-use std::fmt;
 
-use crate::api;
+use std::fmt;
 impl fmt::Debug for App {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("App")
@@ -116,21 +100,12 @@ pub struct Tasklist {
     pub tasks: Vec<Task>,
 }
 impl Tasklist {
-    pub fn new(id: String, title: String) -> Self {
+    pub fn new(id: String, title: String, tasks: &[Task]) -> Self {
         Self {
             id,
             title,
-            tasks: Vec::new(),
+            tasks: tasks.to_vec(),
         }
-    }
-
-    pub async fn load(
-        &mut self,
-        hub: &TasksHub<HttpsConnector<HttpConnector>>,
-    ) -> anyhow::Result<()> {
-        self.tasks = api::tasks::load(hub, self.id.clone()).await?;
-
-        Ok(())
     }
 
     pub fn len(&self) -> usize {
@@ -139,9 +114,9 @@ impl Tasklist {
     pub fn is_empty(&self) -> bool {
         self.tasks.is_empty()
     }
-    pub fn get(&self, index: usize) -> Option<&Task> {
-        self.tasks.get(index)
-    }
+    // pub fn get(&self, index: usize) -> Option<&Task> {
+    //     self.tasks.get(index)
+    // }
 }
 
 #[derive(Clone, Debug)]

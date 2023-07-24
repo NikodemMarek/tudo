@@ -1,43 +1,65 @@
-extern crate google_tasks1 as tasks1;
-use hyper::client::HttpConnector;
-use hyper_rustls::HttpsConnector;
-use tasks1::oauth2::{read_application_secret, ApplicationSecret, InstalledFlowReturnMethod};
-use tasks1::TasksHub;
-use yup_oauth2::authenticator::Authenticator;
-use yup_oauth2::InstalledFlowAuthenticator;
+use crate::app::App;
+use crate::components;
+use std::{
+    io,
+    time::{Duration, Instant},
+};
 
-static SECRET: &'static str = "client_secret.json";
-static TOKEN_CACHE: &'static str = "tokencache.json";
+use crossterm::{
+    event::{self, Event, KeyCode},
+    terminal::enable_raw_mode,
+};
+use tui::{
+    backend::{Backend, CrosstermBackend},
+    Terminal,
+};
 
-pub async fn login() -> anyhow::Result<Authenticator<HttpsConnector<HttpConnector>>> {
-    let secret: ApplicationSecret = read_application_secret(SECRET).await?;
+pub async fn run(tick_rate: Duration, app: App) -> anyhow::Result<()> {
+    enable_raw_mode()?;
+    let stdout = io::stdout();
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+    terminal.clear()?;
 
-    let auth = InstalledFlowAuthenticator::builder(secret, InstalledFlowReturnMethod::HTTPRedirect)
-        .persist_tokens_to_disk(TOKEN_CACHE)
-        .build()
-        .await?;
+    let res = run_app(&mut terminal, app, tick_rate).await;
 
-    Ok(auth)
+    if let Err(err) = res {
+        println!("{:?}", err)
+    }
+
+    Ok(())
 }
 
-pub async fn get_hub(
-    auth_data: Authenticator<HttpsConnector<HttpConnector>>,
-) -> TasksHub<HttpsConnector<HttpConnector>> {
-    TasksHub::new(
-        hyper::Client::builder().build(
-            hyper_rustls::HttpsConnectorBuilder::new()
-                .with_native_roots()
-                .https_or_http()
-                .enable_http1()
-                .enable_http2()
-                .build(),
-        ),
-        auth_data,
-    )
-}
+async fn run_app<B: Backend>(
+    terminal: &mut Terminal<B>,
+    mut app: App,
+    tick_rate: Duration,
+) -> anyhow::Result<()> {
+    let mut last_tick = Instant::now();
+    loop {
+        terminal.draw(|f| components::ui(f, &mut app))?;
 
-pub async fn setup() -> anyhow::Result<TasksHub<HttpsConnector<HttpConnector>>> {
-    let auth_data = login().await?;
-    let hub = get_hub(auth_data).await;
-    Ok(hub)
+        let timeout = tick_rate
+            .checked_sub(last_tick.elapsed())
+            .unwrap_or_else(|| Duration::from_secs(0));
+        if crossterm::event::poll(timeout)? {
+            if let Event::Key(key) = event::read()? {
+                match key.code {
+                    KeyCode::Char('q') => app.quit(),
+                    KeyCode::Char('l') | KeyCode::Right => app.tasklists_next(),
+                    KeyCode::Char('h') | KeyCode::Left => app.tasklists_previous(),
+                    KeyCode::Char('j') | KeyCode::Down => app.tasks_next(),
+                    KeyCode::Char('k') | KeyCode::Up => app.tasks_previous(),
+                    _ => {}
+                };
+            };
+        }
+        if last_tick.elapsed() >= tick_rate {
+            app.on_tick();
+            last_tick = Instant::now();
+        }
+        if app.should_quit {
+            return Ok(());
+        }
+    }
 }
