@@ -9,7 +9,7 @@ use tui::{
 };
 
 use crate::{
-    app::{Task, Tasklist},
+    app::{Status, Task, Tasklist},
     timestamps::formatter,
     App,
 };
@@ -32,23 +32,37 @@ fn todos_component<'a, B: Backend>(todos: &[Task]) -> Table<'a> {
         .iter()
         .map(|x| {
             Row::new(vec![
+                match x.status {
+                    Status::Todo => Cell::from("☐"),
+                    Status::Done => Cell::from("☑"),
+                    Status::Unknown => Cell::from("?"),
+                },
                 {
                     let (str, color) = x
                         .due
                         .as_ref()
-                        .map(formatter::relative)
-                        .unwrap_or(("".to_string(), Color::Reset));
+                        .map(match x.status {
+                            Status::Todo => formatter::relative,
+                            _ => formatter::absolute,
+                        })
+                        .unwrap_or((String::new(), Color::Reset));
 
                     Cell::from(str).style(Style::default().fg(color))
                 },
-                Cell::from(x.title.clone()),
+                Cell::from(x.title.to_owned()),
+                Cell::from(x.notes.to_owned().unwrap_or_default()),
             ])
         })
         .collect::<Vec<Row>>();
 
     Table::new(todos)
-        .header(Row::new(vec!["Due", "Title"]))
-        .widths(&[Constraint::Length(20), Constraint::Length(20)])
+        .header(Row::new(vec!["", "Due", "Title", "Notes"]))
+        .widths(&[
+            Constraint::Length(1),
+            Constraint::Length(20),
+            Constraint::Length(20),
+            Constraint::Length(50),
+        ])
         .style(Style::default().fg(Color::White))
         .highlight_style(
             Style::default()

@@ -120,17 +120,34 @@ impl Tasklist {
 }
 
 #[derive(Clone, Debug)]
+pub enum Status {
+    Todo,
+    Done,
+    Unknown,
+}
+
+#[derive(Clone, Debug)]
 pub struct Task {
     pub id: String,
+    pub status: Status,
     pub title: String,
     pub due: Option<TimestampType>,
+    pub notes: Option<String>,
 }
 impl Task {
-    pub fn new(id: &str, title: &str, due: Option<TimestampType>) -> Self {
+    pub fn new(
+        id: &str,
+        status: Status,
+        title: &str,
+        due: Option<TimestampType>,
+        notes: Option<&str>,
+    ) -> Self {
         Self {
             id: id.to_string(),
+            status,
             title: title.to_string(),
             due,
+            notes: notes.map(|s| s.to_string()),
         }
     }
 }

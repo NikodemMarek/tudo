@@ -13,6 +13,14 @@ pub mod formatter {
 
     use super::TimestampType;
 
+    pub fn absolute(timestamp: &TimestampType) -> (String, Color) {
+        match timestamp {
+            TimestampType::Date(date) => (date.format("%F").to_string(), Color::White),
+            TimestampType::Time(time) => (time.format("%F").to_string(), Color::White),
+            TimestampType::DateTime(datetime) => (datetime.format("%F").to_string(), Color::White),
+        }
+    }
+
     pub fn relative(timestamp: &TimestampType) -> (String, Color) {
         match timestamp {
             TimestampType::Date(date) => relative_date(date),

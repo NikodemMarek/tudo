@@ -8,9 +8,7 @@ use tasks1::{
 };
 use yup_oauth2::{authenticator::Authenticator, InstalledFlowAuthenticator};
 
-use crate::app::App;
-use crate::app::Task;
-use crate::app::Tasklist;
+use crate::app::{App, Status, Task, Tasklist};
 use crate::timestamps::TimestampType;
 
 static SECRET: &'static str = "client_secret.json";
@@ -96,11 +94,18 @@ async fn load_tasks(
         .map(|x| match x {
             tasks1::api::Task {
                 id: Some(id),
+                status,
                 title: Some(title),
                 due,
+                notes,
                 ..
             } => Some(Task::new(
                 &id.clone(),
+                match status.as_deref() {
+                    Some("needsAction") => Status::Todo,
+                    Some("completed") => Status::Done,
+                    _ => Status::Unknown,
+                },
                 &title.clone(),
                 due.clone()
                     .map(|x| {
@@ -117,6 +122,7 @@ async fn load_tasks(
                             })
                     })
                     .flatten(),
+                notes.as_deref(),
             )),
             _ => None,
         })
