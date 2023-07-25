@@ -9,9 +9,8 @@ use tui::{
 };
 
 use crate::{
-    app::{Status, Task, Tasklist},
+    app::{App, Status, Task, Tasklist},
     timestamps::formatter,
-    App,
 };
 
 fn tasklists<'a, B: Backend>(list_names: &[Tasklist]) -> Tabs<'a> {
@@ -79,7 +78,7 @@ pub fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .split(f.size());
 
     if let Some(tasklist) = app.active_tasklist() {
-        let tabs = tasklists::<B>(&app.tasklists).select(app.active_tasklist);
+        let tabs = tasklists::<B>(app.provider.get_tasklists()).select(app.active_tasklist);
         f.render_widget(tabs, chunks[0]);
 
         match tasklist.is_empty() {

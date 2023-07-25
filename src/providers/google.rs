@@ -8,18 +8,59 @@ use tasks1::{
 };
 use yup_oauth2::{authenticator::Authenticator, InstalledFlowAuthenticator};
 
-use crate::app::{App, Status, Task, Tasklist};
-use crate::timestamps::TimestampType;
+use crate::{
+    app::{App, Status, Task, Tasklist},
+    provider::Provider,
+    timestamps::TimestampType,
+};
 
 static SECRET: &'static str = "client_secret.json";
 static TOKEN_CACHE: &'static str = "tokencache.json";
+
+pub struct GoogleTasksProvider {
+    hub: TasksHub<HttpsConnector<HttpConnector>>,
+
+    tasklists: Vec<Tasklist>,
+}
+
+impl GoogleTasksProvider {
+    fn new(hub: TasksHub<HttpsConnector<HttpConnector>>) -> Self {
+        Self {
+            hub,
+            tasklists: Vec::new(),
+        }
+    }
+
+    async fn load_tasklists(&mut self) -> anyhow::Result<()> {
+        self.tasklists = load_tasklists(&self.hub).await?;
+
+        Ok(())
+    }
+}
+
+impl Provider for GoogleTasksProvider {
+    fn get_tasklists(&self) -> &Vec<Tasklist> {
+        &self.tasklists
+    }
+
+    fn get_tasklist(&self, tasklist_id: &str) -> Option<&Tasklist> {
+        self.tasklists.iter().find(|t| t.id == tasklist_id)
+    }
+
+    fn get_task(&self, tasklist_id: &str, task_id: &str) -> Option<&Task> {
+        self.get_tasklist(tasklist_id)
+            .and_then(|t| t.tasks.iter().find(|t| t.id == task_id))
+    }
+}
 
 pub async fn setup() -> anyhow::Result<App> {
     let auth_data = login().await?;
     let hub = get_hub(auth_data).await;
 
-    let tasklists = load_tasklists(&hub).await?;
-    let app = App::new(&tasklists);
+    let mut provider = GoogleTasksProvider::new(hub);
+    provider.load_tasklists().await?;
+
+    let app = App::new(provider);
 
     Ok(app)
 }

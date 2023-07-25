@@ -1,19 +1,19 @@
 use tui::widgets::TableState;
 
-use crate::timestamps::TimestampType;
+use crate::{provider::Provider, timestamps::TimestampType};
 
 pub struct App {
     pub should_quit: bool,
 
-    pub tasklists: Vec<Tasklist>,
+    pub provider: Box<dyn Provider>,
     pub active_tasklist: usize,
     pub tasks_state: TableState,
 }
 impl App {
-    pub fn new(tasklist: &[Tasklist]) -> Self {
+    pub fn new(provider: impl Provider + 'static) -> Self {
         Self {
             should_quit: false,
-            tasklists: tasklist.to_vec(),
+            provider: Box::new(provider),
             active_tasklist: 0,
             tasks_state: TableState::default(),
         }
@@ -27,7 +27,7 @@ impl App {
     pub fn tasklists_next(&mut self) {
         self.tasks_state = TableState::default();
 
-        self.active_tasklist = (self.active_tasklist + 1) % self.tasklists.len();
+        self.active_tasklist = (self.active_tasklist + 1) % self.provider.tasklists_len();
     }
     pub fn tasklists_previous(&mut self) {
         self.tasks_state = TableState::default();
@@ -35,12 +35,12 @@ impl App {
         if self.active_tasklist > 0 {
             self.active_tasklist -= 1;
         } else {
-            self.active_tasklist = self.tasklists.len() - 1;
+            self.active_tasklist = self.provider.tasklists_len() - 1;
         }
     }
 
     pub fn active_tasklist(&self) -> Option<&Tasklist> {
-        self.tasklists.get(self.active_tasklist)
+        self.provider.get_nth_tasklist(self.active_tasklist)
     }
 
     pub fn tasks_next(&mut self) {
@@ -86,7 +86,7 @@ impl fmt::Debug for App {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("App")
             .field("should_quit", &self.should_quit)
-            .field("tasklists", &self.tasklists)
+            .field("tasklists", &self.provider)
             .field("active_tasklist", &self.active_tasklist)
             .field("active_task", &self.tasks_state)
             .finish()
