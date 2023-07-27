@@ -14,8 +14,9 @@ use crate::{
     timestamps::TimestampType,
 };
 
-static SECRET: &'static str = "client_secret.json";
-static TOKEN_CACHE: &'static str = "tokencache.json";
+// TUDO: use some crate to get better path
+static SECRET: &'static str = "~/.config/tudo/client_secret.json";
+static TOKEN_CACHE: &'static str = "~/.cache/tudo/tokencache.json";
 
 pub struct GoogleTasksProvider {
     hub: TasksHub<HttpsConnector<HttpConnector>>,
