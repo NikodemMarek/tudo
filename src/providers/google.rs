@@ -1,5 +1,6 @@
 extern crate google_tasks1 as tasks1;
 
+use envpath::EnvPath;
 use hyper::client::HttpConnector;
 use hyper_rustls::HttpsConnector;
 use tasks1::{
@@ -10,13 +11,10 @@ use yup_oauth2::{authenticator::Authenticator, InstalledFlowAuthenticator};
 
 use crate::{
     app::{App, Status, Task, Tasklist},
+    config::Cfg,
     provider::Provider,
     timestamps::TimestampType,
 };
-
-// TUDO: use some crate to get better path
-static SECRET: &'static str = "~/.config/tudo/client_secret.json";
-static TOKEN_CACHE: &'static str = "~/.cache/tudo/tokencache.json";
 
 pub struct GoogleTasksProvider {
     hub: TasksHub<HttpsConnector<HttpConnector>>,
@@ -54,8 +52,8 @@ impl Provider for GoogleTasksProvider {
     }
 }
 
-pub async fn setup() -> anyhow::Result<App> {
-    let auth_data = login().await?;
+pub async fn setup(cfg: &Cfg) -> anyhow::Result<App> {
+    let auth_data = login(&cfg.client_secret).await?;
     let hub = get_hub(auth_data).await;
 
     let mut provider = GoogleTasksProvider::new(hub);
@@ -66,13 +64,41 @@ pub async fn setup() -> anyhow::Result<App> {
     Ok(app)
 }
 
-async fn login() -> anyhow::Result<Authenticator<HttpsConnector<HttpConnector>>> {
-    let secret: ApplicationSecret = read_application_secret(SECRET).await?;
+async fn login(
+    client_secret: &str,
+) -> anyhow::Result<Authenticator<HttpsConnector<HttpConnector>>> {
+    let secret: ApplicationSecret = read_application_secret(client_secret).await?;
 
-    let auth = InstalledFlowAuthenticator::builder(secret, InstalledFlowReturnMethod::HTTPRedirect)
-        .persist_tokens_to_disk(TOKEN_CACHE)
-        .build()
-        .await?;
+    let token_cache = EnvPath::from(["$dir: cache", "tudo", "config.toml"])
+        .de()
+        .to_path_buf();
+
+    let token_cache = if token_cache.exists() {
+        Some(token_cache)
+    } else {
+        token_cache
+            .parent()
+            .map(|prefix| {
+                std::fs::create_dir_all(prefix)
+                    .ok()
+                    .map(|_| token_cache.clone())
+            })
+            .flatten()
+    };
+
+    let auth = match token_cache {
+        Some(token_cache) => {
+            InstalledFlowAuthenticator::builder(secret, InstalledFlowReturnMethod::HTTPRedirect)
+                .persist_tokens_to_disk(token_cache)
+                .build()
+                .await?
+        }
+        None => {
+            InstalledFlowAuthenticator::builder(secret, InstalledFlowReturnMethod::HTTPRedirect)
+                .build()
+                .await?
+        }
+    };
 
     Ok(auth)
 }
