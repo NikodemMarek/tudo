@@ -1,9 +1,9 @@
 # tudo
 
-Simple tui wrapper for google-tasks1 rust library.
+Simple tui wrapper for [google-tasks1](https://github.com/Byron/google-apis-rs/tree/main/gen/tasks1) rust library.  
 Manage your google tasks from the terminal.
 
-### Installation
+## Installation
 
 Install tudo with cargo.
 
@@ -11,7 +11,7 @@ Install tudo with cargo.
 cargo install --git https://github.com/NikodemMarek/tudo.git
 ```
 
-Create config `tudo` folder in your config dir,
+Create config `tudo` folder in your config dir,  
 and create config files:
 
 config.toml
