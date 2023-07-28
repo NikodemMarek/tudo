@@ -37,18 +37,44 @@ impl GoogleTasksProvider {
     }
 }
 
+#[async_trait::async_trait]
 impl Provider for GoogleTasksProvider {
     fn get_tasklists(&self) -> &Vec<Tasklist> {
         &self.tasklists
     }
 
-    fn get_tasklist(&self, tasklist_id: &str) -> Option<&Tasklist> {
-        self.tasklists.iter().find(|t| t.id == tasklist_id)
-    }
+    async fn update_task(&mut self, tasklist_id: &str, task: &Task) -> anyhow::Result<()> {
+        self.hub
+            .tasks()
+            .update(task_to_gtask(&task), tasklist_id, &task.id)
+            .doit()
+            .await?;
 
-    fn get_task(&self, tasklist_id: &str, task_id: &str) -> Option<&Task> {
-        self.get_tasklist(tasklist_id)
-            .and_then(|t| t.tasks.iter().find(|t| t.id == task_id))
+        self.load_tasklists().await?;
+
+        Ok(())
+    }
+}
+
+fn task_to_gtask(task: &Task) -> tasks1::api::Task {
+    let status = match task.status {
+        Status::Todo => Some(String::from("needsAction")),
+        Status::Done => Some(String::from("completed")),
+        Status::Unknown => None,
+    };
+    let due = task.due.as_ref().map(|t| match t {
+        TimestampType::Date(date) => date.format("%Y-%m-%dT00:00:00.000Z").to_string(),
+        TimestampType::Time(time) => time.format("00-00-00T%H:%M:%S.000Z").to_string(),
+        TimestampType::DateTime(datetime) => datetime.format("%Y-%m-%dT%H:%M:%S.000Z").to_string(),
+    });
+
+    tasks1::api::Task {
+        id: Some(task.id.clone()),
+        title: Some(task.title.clone()),
+        status,
+        due,
+        notes: task.notes.clone(),
+        ..Default::default()
     }
 }
 

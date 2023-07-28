@@ -27,7 +27,7 @@ impl App {
     pub fn tasklists_next(&mut self) {
         self.tasks_state = TableState::default();
 
-        self.active_tasklist = (self.active_tasklist + 1) % self.provider.tasklists_len();
+        self.active_tasklist = (self.active_tasklist + 1) % self.provider.len();
     }
     pub fn tasklists_previous(&mut self) {
         self.tasks_state = TableState::default();
@@ -35,7 +35,7 @@ impl App {
         if self.active_tasklist > 0 {
             self.active_tasklist -= 1;
         } else {
-            self.active_tasklist = self.provider.tasklists_len() - 1;
+            self.active_tasklist = self.provider.len() - 1;
         }
     }
 
@@ -79,6 +79,45 @@ impl App {
             self.tasks_state.select(None);
         }
     }
+
+    fn active_task(&self) -> Option<&Task> {
+        if let Some(tasklist) = self.active_tasklist() {
+            if let Some(i) = self.tasks_state.selected() {
+                tasklist.get(i)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    pub async fn toggle_task_state(&mut self) -> anyhow::Result<()> {
+        let tasklist = self
+            .active_tasklist()
+            .ok_or(anyhow::anyhow!("no active tasklist"))?;
+        let task = self
+            .active_task()
+            .ok_or(anyhow::anyhow!("no active task"))?;
+
+        let status = match task.status {
+            Status::Todo => Status::Done,
+            Status::Done => Status::Todo,
+            Status::Unknown => Status::Unknown,
+        };
+
+        self.provider
+            .update_task(
+                &tasklist.id.clone(),
+                &Task {
+                    status,
+                    ..task.clone()
+                },
+            )
+            .await?;
+
+        Ok(())
+    }
 }
 
 use std::fmt;
@@ -114,9 +153,9 @@ impl Tasklist {
     pub fn is_empty(&self) -> bool {
         self.tasks.is_empty()
     }
-    // pub fn get(&self, index: usize) -> Option<&Task> {
-    //     self.tasks.get(index)
-    // }
+    pub fn get(&self, index: usize) -> Option<&Task> {
+        self.tasks.get(index)
+    }
 }
 
 #[derive(Clone, Debug)]

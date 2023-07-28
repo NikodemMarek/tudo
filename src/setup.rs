@@ -44,16 +44,21 @@ async fn run_app<B: Backend>(
             .unwrap_or_else(|| Duration::from_secs(0));
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') => app.quit(),
-                    KeyCode::Char('l') | KeyCode::Right => app.tasklists_next(),
-                    KeyCode::Char('h') | KeyCode::Left => app.tasklists_previous(),
-                    KeyCode::Char('j') | KeyCode::Down => app.tasks_next(),
-                    KeyCode::Char('k') | KeyCode::Up => app.tasks_previous(),
-                    _ => {}
-                };
-            };
+                if let Err(err) = match key.code {
+                    KeyCode::Char('q') => Ok(app.quit()),
+                    KeyCode::Char('l') | KeyCode::Right => Ok(app.tasklists_next()),
+                    KeyCode::Char('h') | KeyCode::Left => Ok(app.tasklists_previous()),
+                    KeyCode::Char('j') | KeyCode::Down => Ok(app.tasks_next()),
+                    KeyCode::Char('k') | KeyCode::Up => Ok(app.tasks_previous()),
+                    KeyCode::Enter => app.toggle_task_state().await,
+                    _ => Ok(()),
+                } {
+                    // TODO: print errors nicely
+                    print!("{:?}", err)
+                }
+            }
         }
+
         if last_tick.elapsed() >= tick_rate {
             app.on_tick();
             last_tick = Instant::now();
