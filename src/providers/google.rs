@@ -35,6 +35,26 @@ impl GoogleTasksProvider {
 
         Ok(())
     }
+
+    async fn load_tasklist(&mut self, id: &str) -> anyhow::Result<()> {
+        let tasks = load_tasks(&self.hub, id).await?;
+        let tasklist = self
+            .tasklists
+            .iter()
+            .find(|t| t.id == id)
+            .ok_or(anyhow::anyhow!("tasklist with id {} not found", id))?;
+        let tasklist = Tasklist {
+            tasks,
+            ..tasklist.clone()
+        };
+
+        self.tasklists
+            .iter_mut()
+            .find(|t| t.id == id)
+            .map(|t| *t = tasklist);
+
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -50,31 +70,9 @@ impl Provider for GoogleTasksProvider {
             .doit()
             .await?;
 
-        self.load_tasklists().await?;
+        self.load_tasklist(tasklist_id).await?;
 
         Ok(())
-    }
-}
-
-fn task_to_gtask(task: &Task) -> tasks1::api::Task {
-    let status = match task.status {
-        Status::Todo => Some(String::from("needsAction")),
-        Status::Done => Some(String::from("completed")),
-        Status::Unknown => None,
-    };
-    let due = task.due.as_ref().map(|t| match t {
-        TimestampType::Date(date) => date.format("%Y-%m-%dT00:00:00.000Z").to_string(),
-        TimestampType::Time(time) => time.format("00-00-00T%H:%M:%S.000Z").to_string(),
-        TimestampType::DateTime(datetime) => datetime.format("%Y-%m-%dT%H:%M:%S.000Z").to_string(),
-    });
-
-    tasks1::api::Task {
-        id: Some(task.id.clone()),
-        title: Some(task.title.clone()),
-        status,
-        due,
-        notes: task.notes.clone(),
-        ..Default::default()
     }
 }
 
@@ -175,7 +173,7 @@ async fn load_tasklists(
 
 async fn load_tasks(
     hub: &TasksHub<HttpsConnector<HttpConnector>>,
-    id: &String,
+    id: &str,
 ) -> anyhow::Result<Vec<Task>> {
     let raw_tasks = hub.tasks().list(id).doit().await?.1.items;
     let raw_tasks = match raw_tasks {
@@ -185,43 +183,71 @@ async fn load_tasks(
 
     let tasks: Vec<Task> = raw_tasks
         .iter()
-        .map(|x| match x {
-            tasks1::api::Task {
-                id: Some(id),
-                status,
-                title: Some(title),
-                due,
-                notes,
-                ..
-            } => Some(Task::new(
-                &id.clone(),
-                match status.as_deref() {
-                    Some("needsAction") => Status::Todo,
-                    Some("completed") => Status::Done,
-                    _ => Status::Unknown,
-                },
-                &title.clone(),
-                due.clone()
-                    .map(|x| {
-                        chrono::DateTime::parse_from_rfc3339(&x)
-                            .ok()
-                            .map(|y| match x {
-                                i if i.ends_with("T00:00:00.000Z") => {
-                                    TimestampType::Date(y.naive_local().date())
-                                }
-                                i if i.starts_with("0000-00-00T") => {
-                                    TimestampType::Time(y.naive_local().time())
-                                }
-                                _ => TimestampType::DateTime(y.naive_local()),
-                            })
-                    })
-                    .flatten(),
-                notes.as_deref(),
-            )),
-            _ => None,
-        })
+        .map(|gtask| gtask_to_task(gtask))
         .flatten()
         .collect();
 
     Ok(tasks)
+}
+
+fn gtask_to_task(gtask: &tasks1::api::Task) -> Option<Task> {
+    if let tasks1::api::Task {
+        id: Some(id),
+        status,
+        title: Some(title),
+        due,
+        notes,
+        ..
+    } = gtask
+    {
+        Some(Task::new(
+            &id.clone(),
+            match status.as_deref() {
+                Some("needsAction") => Status::Todo,
+                Some("completed") => Status::Done,
+                _ => Status::Unknown,
+            },
+            &title.clone(),
+            due.clone()
+                .map(|x| {
+                    chrono::DateTime::parse_from_rfc3339(&x)
+                        .ok()
+                        .map(|y| match x {
+                            i if i.ends_with("T00:00:00.000Z") => {
+                                TimestampType::Date(y.naive_local().date())
+                            }
+                            i if i.starts_with("0000-00-00T") => {
+                                TimestampType::Time(y.naive_local().time())
+                            }
+                            _ => TimestampType::DateTime(y.naive_local()),
+                        })
+                })
+                .flatten(),
+            notes.as_deref(),
+        ))
+    } else {
+        None
+    }
+}
+
+fn task_to_gtask(task: &Task) -> tasks1::api::Task {
+    let status = match task.status {
+        Status::Todo => Some(String::from("needsAction")),
+        Status::Done => Some(String::from("completed")),
+        Status::Unknown => None,
+    };
+    let due = task.due.as_ref().map(|t| match t {
+        TimestampType::Date(date) => date.format("%Y-%m-%dT00:00:00.000Z").to_string(),
+        TimestampType::Time(time) => time.format("00-00-00T%H:%M:%S.000Z").to_string(),
+        TimestampType::DateTime(datetime) => datetime.format("%Y-%m-%dT%H:%M:%S.000Z").to_string(),
+    });
+
+    tasks1::api::Task {
+        id: Some(task.id.clone()),
+        title: Some(task.title.clone()),
+        status,
+        due,
+        notes: task.notes.clone(),
+        ..Default::default()
+    }
 }
